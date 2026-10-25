@@ -1,0 +1,163 @@
+name: CI CheckU
+
+# Evento: cada push a main/develop y cada pull request hacia main.
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# Cada job sigue el flujo esperado: 1 Checkout -> 2 Preparacion -> 3 Build -> 4 Test -> 5 Resultados
+jobs:
+  backend:
+    name: Backend (Flask + MySQL)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: BackEnd
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: cuu
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      MYSQL_HOST: 127.0.0.1
+      MYSQL_PORT: "3306"
+      MYSQL_USER: root
+      MYSQL_PASSWORD: root
+      MYSQL_DB: cuu
+    steps:
+      - name: "1. Checkout - obtener el codigo fuente"
+        uses: actions/checkout@v4
+
+      - name: "2. Preparacion - Python 3.12"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: BackEnd/requirements-dev.txt
+      - name: "2. Preparacion - instalar dependencias"
+        run: pip install -r requirements-dev.txt
+
+      - name: "3. Build - compilar todo el codigo Python"
+        run: python -m compileall -q . -x "migrations|venv"
+      - name: "3. Build - flake8 errores criticos (bloquea)"
+        run: flake8 . --select=E9,F63,F7,F82 --show-source --statistics
+      - name: "3. Build - flake8 estilo (informativo)"
+        run: flake8 . --exit-zero --statistics --count
+      - name: "3. Build - Bandit severidad alta (bloquea)"
+        run: bandit -r . -lll -x ./tests,./migrations,./venv
+      - name: "3. Build - Bandit completo (informativo)"
+        run: bandit -r . -x ./tests,./migrations,./venv --exit-zero -q
+
+      - name: "4. Test - pruebas automatizadas con pytest"
+        run: >-
+          pytest tests -v --cov=. --cov-report=term --cov-report=xml
+          --cov-fail-under=35 --junitxml=report.xml
+      - name: "4. Test - prueba de humo contra MySQL real"
+        run: |
+          python - <<'PY'
+          from app import create_app
+          r = create_app().test_client().get('/api/health')
+          data = r.get_json()
+          print(r.status_code, data)
+          assert r.status_code == 200 and data['database_connection'] == 'ok'
+          PY
+      - name: "4. Test - datos semilla en MySQL"
+        run: flask --app app seed
+
+      - name: "5. Resultados - publicar reportes"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reportes-backend
+          path: |
+            BackEnd/report.xml
+            BackEnd/coverage.xml
+
+  web:
+    name: Portal web (Next.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: "1. Checkout - obtener el codigo fuente"
+        uses: actions/checkout@v4
+      - name: "2. Preparacion - Node 22"
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: "2. Preparacion - npm ci"
+        run: npm ci
+      - name: "3. Build - verificacion de tipos TypeScript"
+        run: npx tsc --noEmit
+      - name: "3. Build - npm run build"
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+      - name: "4. Test - pruebas del portal (si existen)"
+        run: npm test --if-present
+
+  movil:
+    name: App movil (React Native)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Movil
+    steps:
+      - name: "1. Checkout - obtener el codigo fuente"
+        uses: actions/checkout@v4
+      - name: "2. Preparacion - Node 22"
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: Movil/package-lock.json
+      - name: "2. Preparacion - npm ci"
+        run: npm ci
+      - name: "3. Build - verificacion de tipos TypeScript"
+        run: npx tsc --noEmit
+      - name: "3. Build - ESLint (informativo)"
+        run: npx eslint . || true
+      - name: "4. Test - Jest"
+        run: npx jest --ci
+
+  # 5. RESULTADOS: puerta final; un solo check obligatorio para proteger main
+  resultados:
+    name: "5. Resultados - CI aprobado"
+    if: always()
+    needs: [backend, web, movil]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluar resultado y publicar resumen
+        run: |
+          {
+            echo "## Resultado del pipeline CheckU"
+            echo "| Etapa | Resultado |"
+            echo "|---|---|"
+            echo "| Backend (Flask + MySQL) | ${{ needs.backend.result }} |"
+            echo "| Portal web (Next.js) | ${{ needs.web.result }} |"
+            echo "| App movil (React Native) | ${{ needs.movil.result }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ needs.backend.result }}" != "success" ] || [ "${{ needs.web.result }}" != "success" ] || [ "${{ needs.movil.result }}" != "success" ]; then
+            echo "Pipeline RECHAZADO"; exit 1; fi
+          echo "Pipeline APROBADO"
