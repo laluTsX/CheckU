@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --checku-green: #63B89F;
+  --checku-mint: #A8D8C8;
+  --checku-navy: #172B4D;
+  --checku-white: #FFFFFF;
+  --checku-slate: #6F7F8A;
+  --checku-dark: #0D1828;
+}
+
+body {
+  color: var(--checku-navy);
+  background-color: #F8FAFC;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #F1F5F9;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+.checku-btn-primary {
+  background-color: #63B89F;
+  color: #FFFFFF;
+  font-weight: 600;
+  padding: 0.625rem 1.25rem;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease-in-out;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.checku-btn-primary:hover {
+  background-color: #52a78e;
+  box-shadow: 0 4px 12px rgba(99, 184, 159, 0.35);
+}
+
+.checku-btn-secondary {
+  background-color: #FFFFFF;
+  color: #172B4D;
+  border: 1px solid #E2E8F0;
+  font-weight: 500;
+  padding: 0.625rem 1.25rem;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease-in-out;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.checku-btn-secondary:hover {
+  background-color: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+.checku-card {
+  background: #FFFFFF;
+  border: 1px solid #EDF2F7;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}

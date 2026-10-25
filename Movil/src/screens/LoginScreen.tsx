@@ -1,0 +1,476 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  ActivityIndicator,
+} from 'react-native';
+import COLORS from '../theme/colors';
+import { useAuth } from '../context/AuthContext';
+import { getApiUrl, setCustomApiUrl } from '../services/api';
+
+export const LoginScreen: React.FC = () => {
+  const [role, setRole] = useState<'alumno' | 'profesor'>('alumno');
+  const [matricula, setMatricula] = useState('');
+  const [password, setPassword] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [showConfig, setShowConfig] = useState(false);
+  const [customIp, setCustomIp] = useState(getApiUrl());
+
+  const { loginAlumno, loginProfesor, isLoading } = useAuth();
+
+  const handleLogin = async () => {
+    setErrorMsg('');
+    if (!matricula.trim()) {
+      setErrorMsg('Por favor ingresa tu matrícula.');
+      return;
+    }
+
+    if (role === 'profesor' && !password.trim()) {
+      setErrorMsg('Ingresa tu contraseña de docente.');
+      return;
+    }
+
+    if (role === 'alumno') {
+      const res = await loginAlumno(matricula.trim().toUpperCase());
+      if (!res.success) {
+        setErrorMsg(res.message || 'Matrícula no encontrada.');
+      }
+    } else {
+      const res = await loginProfesor(matricula.trim(), password.trim());
+      if (!res.success) {
+        setErrorMsg(res.message || 'Credenciales de docente inválidas.');
+      }
+    }
+  };
+
+  const fillStudentDemo = (mat: string) => {
+    setMatricula(mat);
+    setErrorMsg('');
+  };
+
+  const fillTeacherDemo = () => {
+    setMatricula('DOC-202401');
+    setPassword('Password123!');
+    setErrorMsg('');
+  };
+
+  const saveApiUrl = () => {
+    setCustomApiUrl(customIp);
+    setShowConfig(false);
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.keyboardContainer}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          {/* Brand Header */}
+          <View style={styles.brandHeader}>
+            <View style={styles.logoBadge}>
+              <Text style={styles.logoBadgeText}>✓</Text>
+            </View>
+            <Text style={styles.brandTitle}>
+              Check<Text style={{ color: COLORS.green }}>U</Text>
+            </Text>
+            <Text style={styles.brandSubtitle}>Control de Asistencia Universitario</Text>
+          </View>
+
+          {/* Role Toggle */}
+          <View style={styles.toggleContainer}>
+            <TouchableOpacity
+              style={[styles.toggleTab, role === 'alumno' && styles.toggleTabActive]}
+              onPress={() => {
+                setRole('alumno');
+                setErrorMsg('');
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.toggleText, role === 'alumno' && styles.toggleTextActive]}>
+                Soy Alumno
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.toggleTab, role === 'profesor' && styles.toggleTabActive]}
+              onPress={() => {
+                setRole('profesor');
+                setErrorMsg('');
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.toggleText, role === 'profesor' && styles.toggleTextActive]}>
+                Soy Docente
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Main Form Card */}
+          <View style={styles.card}>
+            <Text style={styles.formTitle}>
+              {role === 'alumno' ? 'Acceso para Alumnos' : 'Acceso para Docentes'}
+            </Text>
+            <Text style={styles.formSubtitle}>
+              {role === 'alumno'
+                ? 'Ingresa únicamente tu matrícula para ver tu horario y registrar asistencia.'
+                : 'Ingresa con tu nómina y contraseña institucional.'}
+            </Text>
+
+            {errorMsg ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{errorMsg}</Text>
+              </View>
+            ) : null}
+
+            {/* Matricula Input */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>
+                {role === 'alumno' ? 'Matrícula del Alumno' : 'Nómina o Matrícula Docente'}
+              </Text>
+              <TextInput
+                style={styles.input}
+                placeholder={role === 'alumno' ? 'Ej. A01700101' : 'Ej. DOC-202401'}
+                placeholderTextColor={COLORS.slate}
+                value={matricula}
+                onChangeText={(text) => setMatricula(text.toUpperCase())}
+                autoCapitalize="characters"
+                autoCorrect={false}
+              />
+            </View>
+
+            {/* Password input only for profesor */}
+            {role === 'profesor' && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Contraseña</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="••••••••"
+                  placeholderTextColor={COLORS.slate}
+                  secureTextEntry
+                  value={password}
+                  onChangeText={setPassword}
+                />
+              </View>
+            )}
+
+            {/* Submit Button */}
+            <TouchableOpacity
+              style={styles.submitButton}
+              onPress={handleLogin}
+              disabled={isLoading}
+              activeOpacity={0.8}
+            >
+              {isLoading ? (
+                <ActivityIndicator color={COLORS.white} />
+              ) : (
+                <Text style={styles.submitButtonText}>
+                  {role === 'alumno' ? 'Ingresar como Alumno' : 'Ingresar como Docente'}
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            {/* Quick Demo Fill Buttons */}
+            <View style={styles.demoSection}>
+              <Text style={styles.demoTitle}>Prueba rápida con cuentas demo:</Text>
+              {role === 'alumno' ? (
+                <View style={styles.demoChips}>
+                  <TouchableOpacity
+                    style={styles.chip}
+                    onPress={() => fillStudentDemo('A01700101')}
+                  >
+                    <Text style={styles.chipText}>A01700101 (Sofía)</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.chip}
+                    onPress={() => fillStudentDemo('A01700102')}
+                  >
+                    <Text style={styles.chipText}>A01700102 (Mateo)</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.chip}
+                    onPress={() => fillStudentDemo('A01700103')}
+                  >
+                    <Text style={styles.chipText}>A01700103 (Valentina)</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.teacherDemoButton} onPress={fillTeacherDemo}>
+                  <Text style={styles.teacherDemoText}>
+                    ⚡ Autocompletar: DOC-202401 (Dr. Carlos Mendoza)
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* Server Config Accordion / Link */}
+          <TouchableOpacity
+            style={styles.configToggle}
+            onPress={() => setShowConfig(!showConfig)}
+          >
+            <Text style={styles.configToggleText}>
+              ⚙ Servidor API: {getApiUrl()}
+            </Text>
+          </TouchableOpacity>
+
+          {showConfig && (
+            <View style={styles.configBox}>
+              <Text style={styles.configLabel}>Cambiar IP / URL del Backend:</Text>
+              <TextInput
+                style={styles.configInput}
+                value={customIp}
+                onChangeText={setCustomIp}
+                placeholder="http://192.168.1.XX:5000/api"
+                autoCapitalize="none"
+              />
+              <TouchableOpacity style={styles.configSaveButton} onPress={saveApiUrl}>
+                <Text style={styles.configSaveButtonText}>Guardar Conexión</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: COLORS.navy,
+  },
+  keyboardContainer: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    padding: 24,
+    justifyContent: 'center',
+  },
+  brandHeader: {
+    alignItems: 'center',
+    marginBottom: 28,
+  },
+  logoBadge: {
+    width: 60,
+    height: 60,
+    borderRadius: 18,
+    backgroundColor: COLORS.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+    shadowColor: COLORS.green,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  logoBadgeText: {
+    color: COLORS.white,
+    fontSize: 32,
+    fontWeight: '900',
+  },
+  brandTitle: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: COLORS.white,
+    letterSpacing: -0.5,
+  },
+  brandSubtitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.mint,
+    marginTop: 4,
+    letterSpacing: 0.5,
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 16,
+    padding: 4,
+    marginBottom: 20,
+  },
+  toggleTab: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  toggleTabActive: {
+    backgroundColor: COLORS.green,
+  },
+  toggleText: {
+    color: COLORS.slate,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  toggleTextActive: {
+    color: COLORS.white,
+  },
+  card: {
+    backgroundColor: COLORS.white,
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  formTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.navy,
+  },
+  formSubtitle: {
+    fontSize: 12,
+    color: COLORS.slate,
+    marginTop: 4,
+    marginBottom: 18,
+    lineHeight: 18,
+  },
+  errorContainer: {
+    backgroundColor: '#FEE2E2',
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: '#B91C1C',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.navy,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  input: {
+    height: 48,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.navy,
+  },
+  submitButton: {
+    backgroundColor: COLORS.green,
+    height: 50,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    shadowColor: COLORS.green,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  submitButtonText: {
+    color: COLORS.white,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  demoSection: {
+    marginTop: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  demoTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.slate,
+    marginBottom: 8,
+  },
+  demoChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  chip: {
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  chipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.navy,
+  },
+  teacherDemoButton: {
+    backgroundColor: '#F0FDF4',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  teacherDemoText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#15803D',
+  },
+  configToggle: {
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  configToggleText: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.5)',
+  },
+  configBox: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 10,
+  },
+  configLabel: {
+    color: COLORS.mint,
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  configInput: {
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    borderRadius: 8,
+    height: 38,
+    paddingHorizontal: 10,
+    color: COLORS.white,
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  configSaveButton: {
+    backgroundColor: COLORS.green,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  configSaveButtonText: {
+    color: COLORS.white,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+});
+
+export default LoginScreen;
