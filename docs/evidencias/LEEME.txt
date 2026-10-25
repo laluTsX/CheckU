@@ -1,0 +1,5 @@
+Guarda aqui las capturas de pantalla de GitHub Actions:
+ 01_pipeline_iniciado.png   (pestaña Actions, ejecucion en curso tras el push)
+ 02_ejecucion_fallida.png   (ejecucion en rojo con el error)
+ 03_ejecucion_exitosa.png   (todas las etapas en verde)
+ 04_detalle_pruebas.png     (log del paso pytest)
